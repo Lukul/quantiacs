@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow
 
-model = tensorflow.keras.models.load_model("modelmulti")
+model = tensorflow.keras.models.load_model("modelmulticonv")
 counter = 0
 pos = []
 
@@ -32,10 +32,9 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
     set = np.asarray(set)
 
     global model
-    #yhat = model.predict(np.expand_dims(set, axis=0)) #For single stock
-    yhat = model.predict(set)
+    yhat = model.predict(np.expand_dims(set, axis=2))
     yhat = (np.ma.masked_array(yhat, mask=zero_trading_volume_mask[1:], fill_value=0) - 1)
-    yhat[yhat < 0.16] = 0
+    #yhat[yhat < 0.08] = 0
     yhat = np.insert(yhat.filled(), 0, 0.01) #Insert small cash holding
 
     global counter
@@ -45,7 +44,7 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
         pos = yhat
         counter = 1
     else:
-        counter = (counter + 1) % 30
+        counter = (counter + 1) % 20
 
     #print("Day " + str(counter) + " | Invested " + str(pos))
 
@@ -62,8 +61,9 @@ def mySettings():
     settings = {}
 
     #settings['markets'] = ['CASH','AAPL','ABBV','ABT','ACN','AEP','AIG']
-
-
+    #settings['markets'] = ["CASH", "XOM", "MSFT", "AAPL", "WMT", "BRK.B", "GE", "T", "JNJ", "JPM", "C"]
+    settings['markets'] = ["CASH", "GOOGL"]
+    """
     #S&P 100 stocks
     settings['markets']=['AAPL','ABBV','ABT','ACN','AEP','AIG','ALL',
     'AMGN','AMZN','APA','APC','AXP','BA','BAC','BAX','BK','BMY','BRKB','C',
@@ -74,6 +74,7 @@ def mySettings():
     'MRK','MS','MSFT','NKE','NOV','NSC','ORCL','OXY','PEP','PFE','PG','PM',
     'QCOM','RTN','SBUX','SLB','SO','SPG','T','TGT','TWX','TXN','UNH','UNP',
     'UPS','USB','UTX','V','VZ','WAG','WFC','WMT','XOM']
+    """
 
     """
     # Futures Contracts
@@ -88,7 +89,7 @@ def mySettings():
                            'F_ZQ']
     """
 
-    settings['lookback'] = 300
+    settings['lookback'] = 100
     settings['budget'] = 10**6
     settings['slippage'] = 0.05
     settings['participation'] = 1
