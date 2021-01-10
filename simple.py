@@ -61,8 +61,8 @@ def mySettings():
     settings = {}
 
     #settings['markets'] = ['CASH','AAPL','ABBV','ABT','ACN','AEP','AIG']
-    #settings['markets'] = ["CASH", "XOM", "MSFT", "AAPL", "WMT", "BRK.B", "GE", "T", "JNJ", "JPM", "C"]
-    settings['markets'] = ["CASH", "GOOGL"]
+    settings['markets'] = ["CASH", "XOM", "MSFT", "AAPL", "WMT", "BRK.B", "GE", "T", "JNJ", "JPM", "C"]
+    #settings['markets'] = ["CASH", "GOOGL"]
     """
     #S&P 100 stocks
     settings['markets']=['AAPL','ABBV','ABT','ACN','AEP','AIG','ALL',

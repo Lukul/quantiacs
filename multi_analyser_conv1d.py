@@ -11,23 +11,23 @@ np.set_printoptions(threshold=sys.maxsize, linewidth=200, suppress=True)
 
 def preprocess(csv_file, lookback, holding):
 	# Remove the date and p column
-	ticker_data_appl = read[:, 1:-2]
-	volume_data_appl = read[:, -2:-1]
+	ticker_data = read[:, 1:-2]
+	volume_data = read[:, -2:-1]
 
 	set = []
 	profits = []
 
-	for i in range(ticker_data_appl.shape[0] - lookback - holding):
-		training_set_ticker = np.copy(ticker_data_appl[i:i + lookback])
+	for i in range(ticker_data.shape[0] - lookback - holding):
+		training_set_ticker = np.copy(ticker_data[i:i + lookback])
 		close_prize = training_set_ticker[-1][-1]
-		training_set_volumne = np.copy(volume_data_appl[i:i + lookback])
+		training_set_volumne = np.copy(volume_data[i:i + lookback])
 
 		training_set_ticker /= np.max(training_set_ticker)
 		training_set_volumne /= np.max(training_set_volumne)
 
 		training_set = np.append(training_set_ticker, training_set_volumne)
 
-		sell_day_open_prize = ticker_data_appl[i + lookback + holding - 1][0]
+		sell_day_open_prize = ticker_data[i + lookback + holding - 1][0]
 		profit = sell_day_open_prize / close_prize
 
 		set.append(training_set)
@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
 	X_train, X_test, y_train, y_test = train_test_split(X_multi_stock, y_multi_stock, test_size=0.33, random_state=11)
 
-	makenew = True
+	makenew = False
 	if makenew:
 		input_layer = keras.layers.Input((columns, 1))
 
@@ -105,6 +105,7 @@ if __name__ == '__main__':
 		print(loss)
 	else:
 		model = tensorflow.keras.models.load_model("modelmulticonv")
+		model.summary()
 
 	yhat = model.predict(np.expand_dims(X_test, axis=2))
 	predictions = np.column_stack((yhat.flatten(), y_test))
@@ -124,7 +125,3 @@ if __name__ == '__main__':
 	predictions_over_j_in_per = [row.shape[0]/test_size for row in predictions_over_j]
 	predictions_over_j_negative_in_per = [row[np.where([i < 1. for i in row[:, 1]])].shape[0]/row.shape[0] for row in predictions_over_j]
 	print(np.column_stack((cutoff, sums, np.add(sums, negative_sum), means, medians, negative_sum, predictions_over_j_in_per, predictions_over_j_negative_in_per)))
-
-
-
-
