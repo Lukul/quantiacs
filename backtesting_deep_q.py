@@ -1,54 +1,30 @@
 import numpy as np
-import tensorflow
+import tensorflow as tf
 
-model = tensorflow.keras.models.load_model("modelmulticonv")
-counter = 0
-pos = []
+model = tf.keras.models.load_model("modeldeepq2")
 
 def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
-
-    set = []
-
-    zero_trading_volume_mask = np.zeros(len(settings['markets']))
-
-    for i, stock in enumerate(settings['markets']):
-        if i == 0: # CASH
-            continue
-        ticker_set = np.column_stack((OPEN[:,i], HIGH[:,i], LOW[:,i], CLOSE[:,i]))
-
-        ticker_set /= np.max(ticker_set)
-
-        volume = VOL[:,i]
-        volume_set = volume / np.nanmax(np.append(volume, 1.))
-
-        stock_set = np.append(ticker_set, volume_set.astype('float32'))
-
-        if not np.isnan(stock_set).any():
-            set.append(stock_set)
-        else:
-            set.append(np.zeros(stock_set.shape))
-            zero_trading_volume_mask[i] = 1
-
-    set = np.asarray(set)
+    ticker_set = np.column_stack((OPEN, HIGH, LOW, CLOSE))
+    ticker_set /= np.max(ticker_set)
+    volume_set = VOL / np.nanmax(np.append(VOL, 1.))
+    stock_set = np.column_stack((ticker_set.reshape(settings['lookback'], 4), volume_set.astype('float32')))
 
     global model
-    yhat = model.predict(np.expand_dims(set, axis=2))
-    yhat = (np.ma.masked_array(yhat, mask=zero_trading_volume_mask[1:], fill_value=0) - 1)
-    #yhat[yhat < 0.08] = 0
-    yhat = np.insert(yhat.filled(), 0, 0.01) #Insert small cash holding
+    yhat = model(np.expand_dims(stock_set, axis=0), training=False)
+    action = tf.argmax(yhat[0]).numpy()
 
-    global counter
-    global pos
+    pos = 0
+    if action == 0:
+        # short fully
+        pos = -1
+    elif action == 1:
+        # hold
+        pos = pos
+    elif action == 2:
+        # long fully
+        pos = 1
 
-    if counter == 0:
-        pos = yhat
-        counter = 1
-    else:
-        counter = (counter + 1) % 20
-
-    #print("Day " + str(counter) + " | Invested " + str(pos))
-
-    return pos, settings
+    return np.asarray([pos]), settings
 
 
 ##### Do not change this function definition #####
@@ -60,9 +36,9 @@ def mySettings():
     # Default competition and evaluation mySettings
     settings = {}
 
-    #settings['markets'] = ['CASH','AAPL','ABBV','ABT','ACN','AEP','AIG']
-    settings['markets'] = ["CASH", "XOM", "MSFT", "AAPL", "WMT", "BRK.B", "GE", "T", "JNJ", "JPM", "C"]
-    #settings['markets'] = ["CASH", "GOOGL"]
+    settings['markets'] = ['AAPL']
+    #settings['markets'] = ["CASH", "XOM", "MSFT", "AAPL", "WMT", "BRK.B", "GE", "T", "JNJ", "JPM", "C"]
+    #settings['markets'] = ["CASH", "GOOGL", "CAT", "ABBV", "ORCL", "UPS"]
     """
     #S&P 100 stocks
     settings['markets']=['AAPL','ABBV','ABT','ACN','AEP','AIG','ALL',
@@ -89,7 +65,7 @@ def mySettings():
                            'F_ZQ']
     """
 
-    settings['lookback'] = 100
+    settings['lookback'] = 32
     settings['budget'] = 10**6
     settings['slippage'] = 0.05
     settings['participation'] = 1

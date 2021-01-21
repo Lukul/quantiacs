@@ -2,80 +2,70 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-from numpy import genfromtxt
+import random
+import sys
+
+np.set_printoptions(threshold=sys.maxsize, linewidth=200, suppress=True)
 
 class Trading:
 
-    ticker_data = []
-    profits = []
-
+    training_sets = []
+    close_prices = []
+    #Defines long, cash, short position
     pos = 0
-
+    #Index when this was last changed
+    pos_i = 0
     i = 0
-
-    def preprocess(self):
-        lookback = 32
-        holding = 1
-
-        read = genfromtxt('tickerData/' + "AAPL.txt", delimiter=',', skip_header=1)
-        # Remove the date and p column
-        ticker_data = read[:, 1:-2]
-        volume_data = read[:, -2:-1]
-
-        set = []
-        profits = []
-
-        for i in range(ticker_data.shape[0] - lookback - holding):
-            training_set_ticker = np.copy(ticker_data[i:i + lookback])
-            close_prize = training_set_ticker[-1][-1]
-            training_set_volumne = np.copy(volume_data[i:i + lookback])
-
-            training_set_ticker /= np.max(training_set_ticker)
-            training_set_volumne /= np.max(training_set_volumne)
-
-            training_set = np.column_stack((training_set_ticker.reshape(lookback, 4), training_set_volumne))
-
-            sell_day_close_prize = ticker_data[i + lookback + holding - 1][-1]
-            profit = sell_day_close_prize / close_prize - 1
-
-            print(training_set)
-            exit(0)
-
-            set.append(training_set)
-            profits.append(profit)
-
-        set = np.asarray(set)
-        profits = np.asarray(profits)
-        return set, profits
+    depth = 20
 
     def __init__(self):
-        self.ticker_data, self.profits = self.preprocess()
+        self.training_sets, self.close_prices = self.preprocess()
+
+
+    def preprocess(self):
+        training_sets = np.load('Kraken_Trading_History/XBTUSD_15min_train_sets.npy').astype('float32')
+        candle_sticks = np.load('Kraken_Trading_History/XBTUSD_15min_candles.npy').astype('float32')
+        #print(training_sets[22796].reshape(13, 13))
+        #print(np.where(training_sets == np.min(training_sets))) #, np.max(training_sets)
+        #print(np.min(candle_sticks), np.max(candle_sticks))
+        return training_sets, candle_sticks[300:, 3]
 
     def reset(self):
-        self.pos = 0
-        self.i = 0
-        return self.ticker_data[0]
+        self.pos = 0.
+        self.i = random.randint(0,200000) + self.depth
+        self.pos_i = self.i
+        return np.column_stack(self.training_sets[self.i - self.depth:self.i]).reshape(13, 13, self.depth)
+
+    def pnl(self):
+        return self.close_prices[self.i] - self.close_prices[self.pos_i]
 
     def step(self, value):
         self.i += 1
-        if self.i >= self.ticker_data.shape[0] - 1:
+        if self.i >= self.training_sets.shape[0] - 1:
             done = True
         else:
             done = False
 
+        previous_pos = self.pos
         if value == 0:
             #short fully
             self.pos = -1
         elif value == 1:
-            #hold
-            self.pos = self.pos
+            #cash
+            self.pos = 0
         elif value == 2:
             #long fully
             self.pos = 1
 
-        reward = self.profits[self.i] * self.pos
+        reward = 0
+        if previous_pos != self.pos:
+            self.pos_i = self.i
+            #Assuming 1% trading costs and slippage
+            reward = previous_pos * self.pnl() - (np.abs(previous_pos) + np.abs(self.pos)) * 0.02
 
-        return self.ticker_data[self.i], reward, done
+        nn_input = np.column_stack(self.training_sets[self.i-self.depth:self.i]).reshape(13, 13, self.depth)
+
+        return nn_input, reward, done
 
 # Configuration paramaters for the whole setup
 seed = 42
@@ -89,11 +79,6 @@ epsilon_interval = (
 batch_size = 32  # Size of batch taken from replay buffer
 max_steps_per_episode = 10000
 
-# Use the Baseline Atari environment because of Deepmind helper functions
-#env = make_atari("BreakoutNoFrameskip-v4")
-# Warp the frames, grey scale, stake four frame and scale to smaller ratio
-#env = wrap_deepmind(env, frame_stack=True, scale=True)
-#env.seed(seed)
 env = Trading()
 
 num_actions = 3
@@ -101,11 +86,11 @@ num_actions = 3
 
 def create_q_model():
     # Network defined by the Deepmind paper
-    inputs = layers.Input(shape=(32, 5, 1))
+    inputs = layers.Input(shape=(13, 13, env.depth))
 
     # Convolutions on the frames on the screen
     #TODO enhance data set to allow padding valid
-    layer1 = layers.Conv2D(32, 8, strides=4, padding="same", activation="relu")(inputs)
+    layer1 = layers.Conv2D(32, 5, padding="same", activation="relu")(inputs)
     layer2 = layers.Conv2D(64, 4, strides=2, padding="same", activation="relu")(layer1)
     layer3 = layers.Conv2D(64, 3, strides=1, padding="same", activation="relu")(layer2)
 
@@ -139,7 +124,8 @@ episode_reward_history = []
 running_reward = 0
 episode_count = 0
 frame_count = 0
-# Number of frames to take random action and observe output
+# Number of frames to take random action and
+# observe output
 epsilon_random_frames = 50000
 # Number of frames for exploration
 epsilon_greedy_frames = 1000000.0
@@ -259,10 +245,5 @@ while True:  # Run until solved
         del episode_reward_history[:1]
     running_reward = np.mean(episode_reward_history)
 
-    model.save("modeldeepq2")
-
+    model.save("modeldeepqkraken")
     episode_count += 1
-
-    if running_reward > 25:  # Condition to consider the task solved
-        print("Solved at episode {}!".format(episode_count))
-        break

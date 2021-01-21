@@ -25,19 +25,19 @@ def preprocess(csv_file, lookback, holding):
 		training_set_ticker /= np.max(training_set_ticker)
 		training_set_volumne /= np.max(training_set_volumne)
 
-		training_set = np.append(training_set_ticker, training_set_volumne)
+		training_set = np.column_stack((training_set_ticker.reshape(lookback, 4), training_set_volumne))
 
 		sell_day_open_prize = ticker_data[i + lookback + holding - 1][0]
 		profit = sell_day_open_prize / close_prize
 
-		set.append(np.reshape(training_set, (lookback, 5)))
+		set.append(training_set)
 		profits.append(profit)
 
 	set = np.asarray(set)
 	profits = np.asarray(profits)
 
-	#start = int(set.shape[0] * 0.25)
-	#end = int(set.shape[0] * 0.75)
+	#start = int(set.shape[0] * 0)
+	#end = int(set.shape[0] * 0.8)
 	#return set[start:end], profits[start:end]
 
 	return set, profits
