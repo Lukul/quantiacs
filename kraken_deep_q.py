@@ -61,7 +61,7 @@ class Trading:
         if previous_pos != self.pos:
             self.pos_i = self.i
             #Assuming 1% trading costs and slippage
-            reward = previous_pos * self.pnl() - (np.abs(previous_pos) + np.abs(self.pos)) * 0.02
+            reward = previous_pos * self.pnl() - (np.abs(previous_pos) + np.abs(self.pos)) * 0.0056
 
         nn_input = np.column_stack(self.training_sets[self.i-self.depth:self.i]).reshape(13, 13, self.depth)
 
@@ -77,7 +77,7 @@ epsilon_interval = (
     epsilon_max - epsilon_min
 )  # Rate at which to reduce chance of random action being taken
 batch_size = 32  # Size of batch taken from replay buffer
-max_steps_per_episode = 10000
+max_steps_per_episode = 250000
 
 env = Trading()
 
@@ -131,7 +131,7 @@ epsilon_random_frames = 50000
 epsilon_greedy_frames = 1000000.0
 # Maximum replay length
 # Note: The Deepmind paper suggests 1000000 however this causes memory issues
-max_memory_length = 100000
+max_memory_length = 300000
 # Train the model after 4 actions
 update_after_actions = 4
 # How often to update the target network

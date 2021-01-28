@@ -1,5 +1,6 @@
 import talib
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from enum import IntEnum, unique
 @unique
@@ -56,9 +57,11 @@ def calculate_candle_sticks():
 def scale(data, scaler):
 	data = np.asarray(data)
 	if data.ndim == 1:
-		return scaler.transform(data[-1].reshape(-1, 1)).flatten()
+		return np.expand_dims(data[-1],axis=0)
+		#return scaler.transform(data[-1].reshape(-1, 1)).flatten()
 	else:
-		return scaler.transform(data[:, -1].reshape(-1, 1)).flatten()
+		return data[:, -1]
+		#return scaler.transform(data[:, -1].reshape(-1, 1)).flatten()
 
 def enhance_with_indicators(data):
 	set = []
@@ -69,7 +72,8 @@ def enhance_with_indicators(data):
 	CLOSE = data[:, Candle.CLOSE]
 	VOLUME = data[:, Candle.VOLUME]
 
-	low_high = np.asarray([LOW[-1], HIGH[-1]]).reshape(-1, 1)
+	low_high = talib.BBANDS(CLOSE, timeperiod=14, nbdevup=2, nbdevdn=2, matype=1)
+	low_high = np.asarray([low_high[0][-1], low_high[2][-1]]).reshape(-1, 1)
 	low_high_scaler = StandardScaler()
 	low_high_scaler.fit(low_high)
 
@@ -93,9 +97,6 @@ def enhance_with_indicators(data):
 	set.append(scale(HIGH, low_high_scaler))
 	set.append(scale(LOW, low_high_scaler))
 	set.append(scale(CLOSE, low_high_scaler))
-	set.append(scale(VOLUME, thousand_scaler))
-
-	#Overlap Studies:
 	#Bollinger Bands are envelopes plotted at a standard deviation level above and below a simple moving average of the price.
 	set.append(scale(talib.BBANDS(CLOSE, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0), low_high_scaler)) #121.03399999999903 19719.281591268886
 	set.append(scale(talib.BBANDS(CLOSE, timeperiod=14, nbdevup=2, nbdevdn=2, matype=1), low_high_scaler))
@@ -153,8 +154,12 @@ def enhance_with_indicators(data):
 	set.append(scale(talib.WMA(CLOSE, timeperiod=21), low_high_scaler)) #122.0 19479.342424127473
 	set.append(scale(talib.WMA(CLOSE, timeperiod=50), low_high_scaler)) #122.0 19355.600000135404
 	set.append(scale(talib.WMA(CLOSE, timeperiod=100), low_high_scaler)) #122.21647326732675 19265.66566335264
+	set.append(scale(talib.LINEARREG(CLOSE, timeperiod=14), low_high_scaler))  # 122.0 19585.157142857144
+	set.append(scale(talib.LINEARREG_INTERCEPT(CLOSE, timeperiod=14), low_high_scaler)) #121.54000000000003 19643.968571428577
+	set.append(scale(talib.TSF(CLOSE, timeperiod=14), low_high_scaler)) #122.0 19609.668131868133
 
-	#Momentum Indicators:
+
+
 	#ADX stands for Average Directional Movement Index and can be used to help measure the overall strength of a trend. 
 	#The ADX indicator is an average of expanding price range values.
 	set.append(scale(talib.ADX(HIGH, LOW, CLOSE, timeperiod=10), hundred_scaler)) #0.0 99.99999999999963
@@ -163,161 +168,163 @@ def enhance_with_indicators(data):
 	#ADXR stands for Average Directional Movement Index Rating. ADXR is a component of the Directional Movement System 
 	#developed by Welles Wilder.
 	set.append(scale(talib.ADXR(HIGH, LOW, CLOSE, timeperiod=14), hundred_scaler)) #0.0 99.9999999892742
-	#Absolute Price Oscillator crossing above zero is considered bullish, while crossing below zero is bearish. A 
-	#positive indicator value indicates an upward movement, while negative readings signal a downward trend.
-	set.append(scale(talib.APO(CLOSE, fastperiod = 12, slowperiod = 26, matype = 1), thousand_scaler)) #-536.1910463572985 443.13971636041424
-	#The Aroon indicator is a technical indicator that is used to identify trend changes in the price of an asset, 
-	#as well as the strength of that trend. In essence, the indicator measures the time between highs and the time 
+	#The Aroon indicator is a technical indicator that is used to identify trend changes in the price of an asset,
+	#as well as the strength of that trend. In essence, the indicator measures the time between highs and the time
 	#between lows over a time period. ... The indicator signals when this is happening, and when it isn't
 	set.append(scale(talib.AROON(HIGH, LOW), hundred_scaler)) #0.0 100.0
-	#The Aroon Oscillator is a trend-following indicator that uses aspects of the Aroon Indicator (Aroon Up and Aroon 
-	#Down) to gauge the strength of a current trend and the likelihood that it will continue. Readings above zero
-	#indicate that an uptrend is present, while readings below zero indicate that a downtrend is present.
-	set.append(scale(talib.AROONOSC(HIGH, LOW), hundred_scaler)) #-100.0 100.0
-	#The Balance of Power indicator measures the market strength of buyers against sellers by assessing the ability of 
-	#each side to drive prices to an extreme level. The calculation is: Balance of Power = (Close price – Open price) / 
-	#(High price – Low price) The resulting value can be smoothed by a moving average.
-	set.append(scale(talib.BOP(OPEN, HIGH, LOW, CLOSE), one_scaler)) #-1.0 1.0
-	#The Commodity Channel Index (CCI) measures the current price level relative to an average price level over a given 
-	#period of time. CCI is relatively high when prices are far above their average.
-	set.append(scale(talib.CCI(HIGH, LOW, CLOSE), thousand_scaler)) #-466.66671166042244 466.66673951370416
-	#The Chande Momentum Oscillator (CMO) is a technical momentum indicator developed by Tushar Chande. The CMO 
-	#indicator is created by calculating the difference between the sum of all recent higher closes and the sum of all 
-	#recent lower closes and then dividing the result by the sum of all price movement over a given time period.
-	set.append(scale(talib.CMO(CLOSE, timeperiod=5), hundred_scaler)) #-100.0 100.0
-	set.append(scale(talib.CMO(CLOSE, timeperiod=14), hundred_scaler)) #-99.99999998652726 100.0
-	set.append(scale(talib.CMO(CLOSE, timeperiod=25), hundred_scaler)) #-99.99854211548185 100.0
-	#The Directional Movement Index, or DMI, is an indicator developed by J. ... An optional third line, called 
-	#directional movement (DX) shows the difference between the lines. When +DI is above -DI, there is more upward 
+	#The Directional Movement Index, or DMI, is an indicator developed by J. ... An optional third line, called
+	#directional movement (DX) shows the difference between the lines. When +DI is above -DI, there is more upward
 	#pressure than downward pressure in the price.
 	set.append(scale(talib.DX(HIGH, LOW, CLOSE, timeperiod=5), hundred_scaler)) #0.0 100.0
 	set.append(scale(talib.DX(HIGH, LOW, CLOSE, timeperiod=21), hundred_scaler)) #0.0 100.0
 	set.append(scale(talib.DX(HIGH, LOW, CLOSE, timeperiod=50), hundred_scaler)) #0.0 100.0
-	#Moving average convergence divergence (MACD) is a trend-following momentum indicator that shows the relationship 
-	#between two moving averages of a security’s price.
-	set.append(scale(talib.MACD(CLOSE, fastperiod=5, slowperiod=14, signalperiod=5), thousand_scaler))  # -536.1910463572985 443.13971636041424
-	set.append(scale(talib.MACD(CLOSE, fastperiod=12, slowperiod=26, signalperiod=9), thousand_scaler)) #-536.1910463572985 443.13971636041424
-	set.append(scale(talib.MACD(CLOSE, fastperiod=14, slowperiod=50, signalperiod=25), thousand_scaler))  # -536.1910463572985 443.13971636041424
-
 	set.append(scale(talib.MFI(HIGH, LOW, CLOSE, VOLUME, timeperiod=14), hundred_scaler)) #-5.888410733172162e-08 100.00000000707982
 	set.append(scale(talib.MFI(HIGH, LOW, CLOSE, VOLUME, timeperiod=26), hundred_scaler)) #-1.3802451942902055e-09 100.00000001185656
 	set.append(scale(talib.MFI(HIGH, LOW, CLOSE, VOLUME, timeperiod=100), hundred_scaler)) #-5.3901183535126315e-08 100.00000000091877
 	set.append(scale(talib.MINUS_DI(HIGH, LOW, CLOSE, timeperiod=14), hundred_scaler)) #0.0 99.99999996020233
-	set.append(scale(talib.MINUS_DM(HIGH, LOW, timeperiod=14), thousand_scaler)) #0.0 2909.3760999618785
-	set.append(scale(talib.MOM(CLOSE, timeperiod=10), thousand_scaler)) #-2508.0 1711.2000000000007
-	set.append(scale(talib.MOM(CLOSE, timeperiod=25), thousand_scaler))  # -2508.0 1711.2000000000007
 	set.append(scale(talib.PLUS_DI(HIGH, LOW, CLOSE, timeperiod=14), hundred_scaler)) #0.0 100.0
-	set.append(scale(talib.PLUS_DM(HIGH, LOW, timeperiod=14), thousand_scaler)) #0.0 3697.0008310558483
-	set.append(scale(talib.PPO(CLOSE, fastperiod=12, slowperiod=26, matype=0), hundred_scaler)) #-13.640389725420714 13.383459677599681
-	set.append(scale(talib.ROC(CLOSE, timeperiod=10), hundred_scaler)) #-30.688987999999995 46.74590945777386
-	set.append(scale(talib.ROCP(CLOSE, timeperiod=10), one_scaler)) #-0.30688987999999995 0.46745909457773854
-	set.append(scale(talib.ROCR(CLOSE, timeperiod=10), one_scaler)) #0.69311012 1.4674590945777386
 	set.append(scale(talib.RSI(CLOSE, timeperiod=14), hundred_scaler)) #0.0 100.0
 	set.append(scale(talib.STOCH(HIGH, LOW, CLOSE, fastk_period=5, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0), hundred_scaler)) #-1.0137076363510762e-12 100.00000000000279
 	set.append(scale(talib.STOCHF(HIGH, LOW, CLOSE, fastk_period=5, fastd_period=3, fastd_matype=0), hundred_scaler)) #-1.0137076363510762e-12 100.0000000000012
 	set.append(scale(talib.STOCHRSI(CLOSE, timeperiod=14, fastk_period=5, fastd_period=3, fastd_matype=0), hundred_scaler)) #-1.2166564052525548e-12 100.00000000000011
-	set.append(scale(talib.TRIX(CLOSE, timeperiod=30), one_scaler)) #-0.6044429731575707 0.434667877456385
-	set.append(scale(talib.ULTOSC(HIGH, LOW, CLOSE, timeperiod1=7, timeperiod2=14, timeperiod3=28), hundred_scaler)) #0.0 100.00000032481957
-	set.append(scale(talib.WILLR(HIGH, LOW, CLOSE, timeperiod=14), hundred_scaler)) #-100.00000000000001 0.0
+	set.append(scale(talib.ULTOSC(HIGH, LOW, CLOSE, timeperiod1=7, timeperiod2=14, timeperiod3=28), hundred_scaler))  # 0.0 100.00000032481957
+	set.append(scale(talib.CDL3WHITESOLDIERS(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLDOJI(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLDRAGONFLYDOJI(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLGRAVESTONEDOJI(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLHAMMER(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLHOMINGPIGEON(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLINVERTEDHAMMER(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLLADDERBOTTOM(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLLONGLEGGEDDOJI(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLMATCHINGLOW(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLMORNINGDOJISTAR(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLMORNINGSTAR(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLPIERCING(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLRICKSHAWMAN(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLSTICKSANDWICH(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLTAKURI(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
+	set.append(scale(talib.CDLUNIQUE3RIVER(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
 
-	#Volume	Indicators:
-	set.append(scale(talib.AD(HIGH, LOW, CLOSE, VOLUME), million_scaler)) #-3719.2404462314116 199644.25743563366
-	set.append(scale(talib.ADOSC(HIGH, LOW, CLOSE, VOLUME), thousand_scaler)) #-1843.4418435977714 1237.4131984846026
-	set.append(scale(talib.OBV(CLOSE, VOLUME), million_scaler)) #-23849.75116020021 29139.83770172981
-	
-	#Volatility Indicators:
+
+
+	#Absolute Price Oscillator crossing above zero is considered bullish, while crossing below zero is bearish. A 
+	#positive indicator value indicates an upward movement, while negative readings signal a downward trend.
+	set.append(scale(talib.APO(CLOSE, fastperiod = 12, slowperiod = 26, matype = 1), thousand_scaler)) #-536.1910463572985 443.13971636041424
+	set.append(scale(VOLUME, thousand_scaler))
+	#The Commodity Channel Index (CCI) measures the current price level relative to an average price level over a given
+	#period of time. CCI is relatively high when prices are far above their average.
+	set.append(scale(talib.CCI(HIGH, LOW, CLOSE), thousand_scaler)) #-466.66671166042244 466.66673951370416
+	#Moving average convergence divergence (MACD) is a trend-following momentum indicator that shows the relationship
+	#between two moving averages of a security’s price.
+	set.append(scale(talib.MACD(CLOSE, fastperiod=5, slowperiod=14, signalperiod=5), thousand_scaler))  # -536.1910463572985 443.13971636041424
+	set.append(scale(talib.MACD(CLOSE, fastperiod=12, slowperiod=26, signalperiod=9), thousand_scaler)) #-536.1910463572985 443.13971636041424
+	set.append(scale(talib.MACD(CLOSE, fastperiod=14, slowperiod=50, signalperiod=25), thousand_scaler))  # -536.1910463572985 443.13971636041424
 	set.append(scale(talib.ATR(HIGH, LOW, CLOSE), thousand_scaler)) #0.0 672.1715311610562
-	set.append(scale(talib.NATR(HIGH, LOW, CLOSE), one_scaler)) #0.0 7.881777549670427
-	set.append(scale(talib.TRANGE(HIGH, LOW, CLOSE), thousand_scaler)) #0.0 4000.0
-
-	#Cycle Indicators:
-	set.append(scale(talib.HT_DCPERIOD(CLOSE), hundred_scaler)) #6.91050087362864 49.99951053223339
 	set.append(scale(talib.HT_DCPHASE(CLOSE), hundred_scaler)) #-44.99298332517037 314.99654478107004
+	set.append(scale(talib.LINEARREG_SLOPE(CLOSE, timeperiod=14), hundred_scaler)) #-222.33604395604476 152.37032967033085
+	set.append(scale(talib.STDDEV(CLOSE, timeperiod=5, nbdev=1), thousand_scaler)) #0.0 709.4023698851089
+
+
+
+	set.append(scale(talib.MINUS_DM(HIGH, LOW, timeperiod=14), thousand_scaler)) #0.0 2909.3760999618785
+	set.append(scale(talib.MOM(CLOSE, timeperiod=10), thousand_scaler)) #-2508.0 1711.2000000000007
+	set.append(scale(talib.MOM(CLOSE, timeperiod=25), thousand_scaler))  # -2508.0 1711.2000000000007
+	set.append(scale(talib.PLUS_DM(HIGH, LOW, timeperiod=14), thousand_scaler)) #0.0 3697.0008310558483
+	set.append(scale(talib.ADOSC(HIGH, LOW, CLOSE, VOLUME), thousand_scaler)) #-1843.4418435977714 1237.4131984846026
+	set.append(scale(talib.TRANGE(HIGH, LOW, CLOSE), thousand_scaler)) #0.0 4000.0
 	set.append(scale(talib.HT_PHASOR(CLOSE), thousand_scaler)) #-2873.977625168652 3422.2535328187428
+
+
+
+	#The Balance of Power indicator measures the market strength of buyers against sellers by assessing the ability of 
+	#each side to drive prices to an extreme level. The calculation is: Balance of Power = (Close price – Open price) / 
+	#(High price – Low price) The resulting value can be smoothed by a moving average.
+	set.append(scale(talib.BOP(OPEN, HIGH, LOW, CLOSE), one_scaler)) #-1.0 1.0
+	set.append(scale(talib.ROCP(CLOSE, timeperiod=10), one_scaler)) #-0.30688987999999995 0.46745909457773854
+	set.append(scale(talib.ROCR(CLOSE, timeperiod=10), one_scaler)) #0.69311012 1.4674590945777386
+	set.append(scale(talib.TRIX(CLOSE, timeperiod=30), one_scaler)) #-0.6044429731575707 0.434667877456385
 	set.append(scale(talib.HT_SINE(CLOSE), one_scaler)) #-0.9999999999996187 0.9999999999940317
 	set.append(scale(talib.HT_TRENDMODE(CLOSE), one_scaler)) #0 1
-	
 
-	#Pattern Recognition:
-	#The Two Crows is a three-line bearish reversal candlestick pattern. The pattern requires confirmation, that is, 
-	#the following candles should break a trendline or the nearest support area which may be formed by the first 
-	#candle's line. If the pattern is not confirmed it may act only as a temporary pause within an uptrend.
-	set.append(scale(talib.CDL2CROWS(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
-	set.append(scale(talib.CDL3BLACKCROWS(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+
+
+	set.append(scale(talib.PPO(CLOSE, fastperiod=12, slowperiod=26, matype=0), hundred_scaler)) #-13.640389725420714 13.383459677599681
+	set.append(scale(talib.ROC(CLOSE, timeperiod=10), hundred_scaler)) #-30.688987999999995 46.74590945777386
+	set.append(scale(talib.NATR(HIGH, LOW, CLOSE), one_scaler)) #0.0 7.881777549670427
+	set.append(scale(talib.HT_DCPERIOD(CLOSE), hundred_scaler)) #6.91050087362864 49.99951053223339
+	set.append(scale(talib.CORREL(HIGH, LOW, timeperiod=30), one_scaler)) #-2.4748737341529163 2.2135943621178655
+
+
+
+	set.append(scale(talib.AD(HIGH, LOW, CLOSE, VOLUME), million_scaler)) #-3719.2404462314116 199644.25743563366
+	set.append(scale(talib.OBV(CLOSE, VOLUME), million_scaler)) #-23849.75116020021 29139.83770172981
+	set.append(scale(talib.BETA(HIGH, LOW, timeperiod=5), million_scaler)) #-2971957.111723269 1250567.1172035346
+	set.append(scale(talib.VAR(CLOSE, timeperiod=5, nbdev=1), million_scaler)) #-1.4901161193847656e-07 503251.7223986089
+
+
+
+	# The Aroon Oscillator is a trend-following indicator that uses aspects of the Aroon Indicator (Aroon Up and Aroon
+	# Down) to gauge the strength of a current trend and the likelihood that it will continue. Readings above zero
+	# indicate that an uptrend is present, while readings below zero indicate that a downtrend is present.
+	set.append(scale(talib.AROONOSC(HIGH, LOW), hundred_scaler))  # -100.0 100.0
+	# The Chande Momentum Oscillator (CMO) is a technical momentum indicator developed by Tushar Chande. The CMO
+	# indicator is created by calculating the difference between the sum of all recent higher closes and the sum of all
+	# recent lower closes and then dividing the result by the sum of all price movement over a given time period.
+	set.append(scale(talib.CMO(CLOSE, timeperiod=5), hundred_scaler))  # -100.0 100.0
+	set.append(scale(talib.CMO(CLOSE, timeperiod=14), hundred_scaler))  # -99.99999998652726 100.0
+	set.append(scale(talib.CMO(CLOSE, timeperiod=25), hundred_scaler))  # -99.99854211548185 100.0
 	set.append(scale(talib.CDL3INSIDE(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
 	set.append(scale(talib.CDL3LINESTRIKE(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
 	set.append(scale(talib.CDL3OUTSIDE(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	#Not found once
-	#print_min_max(talib.CDL3STARSINSOUTH(OPEN, HIGH, LOW, CLOSE), hundred_scaler)
-	set.append(scale(talib.CDL3WHITESOLDIERS(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
 	set.append(scale(talib.CDLABANDONEDBABY(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	set.append(scale(talib.CDLADVANCEBLOCK(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
 	set.append(scale(talib.CDLBELTHOLD(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
 	set.append(scale(talib.CDLBREAKAWAY(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
 	set.append(scale(talib.CDLCLOSINGMARUBOZU(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	#Found only three
-	#print_min_max(talib.CDLCONCEALBABYSWALL(OPEN, HIGH, LOW, CLOSE), hundred_scaler)
 	set.append(scale(talib.CDLCOUNTERATTACK(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	set.append(scale(talib.CDLDARKCLOUDCOVER(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
-	set.append(scale(talib.CDLDOJI(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
 	set.append(scale(talib.CDLDOJISTAR(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	set.append(scale(talib.CDLDRAGONFLYDOJI(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
 	set.append(scale(talib.CDLENGULFING(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	set.append(scale(talib.CDLEVENINGDOJISTAR(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
-	set.append(scale(talib.CDLEVENINGSTAR(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
 	set.append(scale(talib.CDLGAPSIDESIDEWHITE(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	set.append(scale(talib.CDLGRAVESTONEDOJI(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
-	set.append(scale(talib.CDLHAMMER(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
-	set.append(scale(talib.CDLHANGINGMAN(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
 	set.append(scale(talib.CDLHARAMI(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
 	set.append(scale(talib.CDLHARAMICROSS(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
 	set.append(scale(talib.CDLHIGHWAVE(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	set.append(scale(talib.CDLHIKKAKE(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-200 200
-	set.append(scale(talib.CDLHIKKAKEMOD(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-200 200
-	set.append(scale(talib.CDLHOMINGPIGEON(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
-	set.append(scale(talib.CDLIDENTICAL3CROWS(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
-	set.append(scale(talib.CDLINNECK(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
-	set.append(scale(talib.CDLINVERTEDHAMMER(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
 	set.append(scale(talib.CDLKICKING(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
 	set.append(scale(talib.CDLKICKINGBYLENGTH(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	set.append(scale(talib.CDLLADDERBOTTOM(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
-	set.append(scale(talib.CDLLONGLEGGEDDOJI(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
 	set.append(scale(talib.CDLLONGLINE(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
 	set.append(scale(talib.CDLMARUBOZU(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	set.append(scale(talib.CDLMATCHINGLOW(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
-	#Single One
-	#print_min_max(talib.CDLMATHOLD(OPEN, HIGH, LOW, CLOSE), hundred_scaler)
-	set.append(scale(talib.CDLMORNINGDOJISTAR(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
-	set.append(scale(talib.CDLMORNINGSTAR(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
-	set.append(scale(talib.CDLONNECK(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
-	set.append(scale(talib.CDLPIERCING(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
-	set.append(scale(talib.CDLRICKSHAWMAN(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
 	set.append(scale(talib.CDLRISEFALL3METHODS(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
 	set.append(scale(talib.CDLSEPARATINGLINES(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	set.append(scale(talib.CDLSHOOTINGSTAR(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
 	set.append(scale(talib.CDLSHORTLINE(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
 	set.append(scale(talib.CDLSPINNINGTOP(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	set.append(scale(talib.CDLSTALLEDPATTERN(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
-	set.append(scale(talib.CDLSTICKSANDWICH(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
-	set.append(scale(talib.CDLTAKURI(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
 	set.append(scale(talib.CDLTASUKIGAP(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	set.append(scale(talib.CDLTHRUSTING(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
 	set.append(scale(talib.CDLTRISTAR(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	set.append(scale(talib.CDLUNIQUE3RIVER(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #0 100
-	#Only 8
-	#print_min_max(talib.CDLUPSIDEGAP2CROWS(OPEN, HIGH, LOW, CLOSE), hundred_scaler)
 	set.append(scale(talib.CDLXSIDEGAP3METHODS(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 100
-	
-	#Statistic Functions:
-	set.append(scale(talib.BETA(HIGH, LOW, timeperiod=5), million_scaler)) #-2971957.111723269 1250567.1172035346
-	set.append(scale(talib.CORREL(HIGH, LOW, timeperiod=30), one_scaler)) #-2.4748737341529163 2.2135943621178655
-	set.append(scale(talib.LINEARREG(CLOSE, timeperiod=14), low_high_scaler)) #122.0 19585.157142857144
 	set.append(scale(talib.LINEARREG_ANGLE(CLOSE, timeperiod=14), hundred_scaler)) #-89.74230272272693 89.62397563202859
-	set.append(scale(talib.LINEARREG_INTERCEPT(CLOSE, timeperiod=14), low_high_scaler)) #121.54000000000003 19643.968571428577
-	set.append(scale(talib.LINEARREG_SLOPE(CLOSE, timeperiod=14), hundred_scaler)) #-222.33604395604476 152.37032967033085
-	set.append(scale(talib.STDDEV(CLOSE, timeperiod=5, nbdev=1), thousand_scaler)) #0.0 709.4023698851089
-	set.append(scale(talib.TSF(CLOSE, timeperiod=14), low_high_scaler)) #122.0 19609.668131868133
-	set.append(scale(talib.VAR(CLOSE, timeperiod=5, nbdev=1), million_scaler)) #-1.4901161193847656e-07 503251.7223986089
+
+
+
+	set.append(scale(talib.WILLR(HIGH, LOW, CLOSE, timeperiod=14), hundred_scaler))  # -100.00000000000001 0.0
+	#The Two Crows is a three-line bearish reversal candlestick pattern. The pattern requires confirmation, that is,
+	#the following candles should break a trendline or the nearest support area which may be formed by the first
+	#candle's line. If the pattern is not confirmed it may act only as a temporary pause within an uptrend.
+	set.append(scale(talib.CDL2CROWS(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+	set.append(scale(talib.CDL3BLACKCROWS(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+	set.append(scale(talib.CDLADVANCEBLOCK(OPEN, HIGH, LOW, CLOSE), hundred_scaler))  # -100 0
+	set.append(scale(talib.CDLDARKCLOUDCOVER(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+	set.append(scale(talib.CDLEVENINGDOJISTAR(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+	set.append(scale(talib.CDLEVENINGSTAR(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+	set.append(scale(talib.CDLHANGINGMAN(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+	set.append(scale(talib.CDLIDENTICAL3CROWS(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+	set.append(scale(talib.CDLINNECK(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+	set.append(scale(talib.CDLONNECK(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+	set.append(scale(talib.CDLSHOOTINGSTAR(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+	set.append(scale(talib.CDLSTALLEDPATTERN(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+	set.append(scale(talib.CDLTHRUSTING(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-100 0
+
+
+	set.append(scale(talib.CDLHIKKAKE(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-200 200
+	set.append(scale(talib.CDLHIKKAKEMOD(OPEN, HIGH, LOW, CLOSE), hundred_scaler)) #-200 200
+
 
 	return np.concatenate(set)
 
@@ -330,15 +337,51 @@ if __name__ == '__main__':
 		candle_sticks = calculate_candle_sticks()
 		np.save(file, candle_sticks)
 
+	file = 'Kraken_Trading_History/XBTUSD_15min_train_sets.npy'
 	training_set = []
+	try:
+		training_set = np.load(file)
+	except FileNotFoundError:
+		lookback = 300
+		for i in np.arange(candle_sticks.shape[0] - lookback):
+			set = enhance_with_indicators(candle_sticks[i:i+lookback])
+			training_set.append(set)
+			if i % 1000 == 0 and i != 0:
+				print("Step", i)
+		training_set = np.asarray(training_set)
+		np.save(file, training_set)
 
-	lookback = 300
-	for i in np.arange(candle_sticks.shape[0] - lookback):
-		set = enhance_with_indicators(candle_sticks[i:i+lookback])
-		training_set.append(set)
-		if i % 1000 == 0:
-			print("Step", i)
+	scaling_groups = [ 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2,
+				       2, 2, 3, 2, 2, 2, 1, 3, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
+				       3, 2, 2, 2, 2, 3, 3, 3, 2, 3, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1,
+				       2, 2, 4, 3, 4, 3, 1, 3, 2, 2, 3, 3, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
+				       2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+				       2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+				       2, 2, 2, 2, 2, 2, 4, 1, 0, 2, 0, 2, 3, 0, 4]
 
-	np.save('Kraken_Trading_History/XBTUSD_15min_train_sets.npy', np.asarray(training_set))
+	#TODO use scaling groups to create min max scalers and then 
+	for row in training_set:
+		row = np.column_stack((scaling_groups, row))
+		row.sort(axis=0)
+		row = np.split(row[:, 1], np.unique(row[:, 0], return_index=True)[1][1:])
+		print(row)
+
+	pearson_matrix = np.corrcoef(np.transpose(training_set))
+
+	fig, ax = plt.subplots()
+	im = ax.imshow(pearson_matrix, cmap=plt.get_cmap('seismic'))
+	# We want to show all ticks...
+	ax.set_xticks(np.arange(169))
+	ax.set_yticks(np.arange(169))
+	for i, label in enumerate(ax.xaxis.get_ticklabels()):
+		label.set_visible(i % 5 == 0)
+	for i, label in enumerate(ax.yaxis.get_ticklabels()):
+		label.set_visible(i % 5 == 0)
+
+	heatmap = plt.pcolor(pearson_matrix, cmap=plt.get_cmap('seismic'))
+	plt.colorbar(heatmap)
+	fig.tight_layout()
+	plt.show()
 
 
